@@ -56,22 +56,30 @@ export default function HomePage() {
       try {
         const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
         
-        // Fetch Homepage Single Type & Products concurrently
+        // Fetch Homepage Single Type & Products concurrently with cache disabled for fresh dynamic data
         const [homeRes, prodRes] = await Promise.all([
-          fetch(`${strapiUrl}/api/homepage?populate=*`),
-          fetch(`${strapiUrl}/api/products`)
+          fetch(`${strapiUrl}/api/homepage?populate=*`, { cache: 'no-store' }),
+          fetch(`${strapiUrl}/api/products`, { cache: 'no-store' })
         ]);
 
         if (homeRes.ok) {
           const homeJson = await homeRes.json();
-          // Strapi v5 returns single type attributes inside data
-          setHomepageData(homeJson.data || {});
+          // Support both direct object or nested attributes format in Strapi v5
+          const attributes = homeJson?.data?.attributes || homeJson?.data || {};
+          setHomepageData(attributes);
         }
 
         if (prodRes.ok) {
           const prodJson = await prodRes.json();
-          const dataArray = Array.isArray(prodJson.data) ? prodJson.data : prodJson.data ? [prodJson.data] : [];
-          setProducts(dataArray);
+          const rawData = prodJson?.data;
+          const dataArray = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
+          // Extract attributes if wrapped (Strapi standard API pattern)
+          const parsedProducts = dataArray.map((item: any) => ({
+            id: item.id,
+            ...item,
+            ...(item.attributes || {})
+          }));
+          setProducts(parsedProducts);
         }
       } catch (error) {
         console.error('Error fetching data from Strapi:', error);
