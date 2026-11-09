@@ -50,13 +50,16 @@ export default function HomePage() {
   const [homepageData, setHomepageData] = useState<HomepageData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Fetch Homepage Data & Products from Strapi v5 with populate=*
+  // Fetch Homepage Data & Products from Strapi v5 with URL cleaning
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'http://localhost:1337';
+        let strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || 'https://nota-backend-production-708b.up.railway.app';
         
-        // Fetch Homepage Single Type & Products concurrently with cache disabled for fresh dynamic data
+        // Remove brackets or unwanted trailing slashes from the URL automatically
+        strapiUrl = strapiUrl.replace(/\[|\]/g, '').replace(/\/$/, '');
+
+        // Fetch Homepage Single Type & Products concurrently with cache disabled
         const [homeRes, prodRes] = await Promise.all([
           fetch(`${strapiUrl}/api/homepage?populate=*`, { cache: 'no-store' }),
           fetch(`${strapiUrl}/api/products`, { cache: 'no-store' })
@@ -64,7 +67,6 @@ export default function HomePage() {
 
         if (homeRes.ok) {
           const homeJson = await homeRes.json();
-          // Support both direct object or nested attributes format in Strapi v5
           const attributes = homeJson?.data?.attributes || homeJson?.data || {};
           setHomepageData(attributes);
         }
@@ -73,7 +75,6 @@ export default function HomePage() {
           const prodJson = await prodRes.json();
           const rawData = prodJson?.data;
           const dataArray = Array.isArray(rawData) ? rawData : rawData ? [rawData] : [];
-          // Extract attributes if wrapped (Strapi standard API pattern)
           const parsedProducts = dataArray.map((item: any) => ({
             id: item.id,
             ...item,
